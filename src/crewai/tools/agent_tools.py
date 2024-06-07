@@ -12,20 +12,21 @@ class AgentTools(BaseModel):
     """Default tools around agent delegation"""
 
     agents: List[Agent] = Field(description="List of agents in this crew.")
-    i18n: I18N = Field(default=I18N(), description="Internationalization settings.")
+    i18n: I18N = Field(
+        default=I18N(), description="Internationalization settings.")
 
     def tools(self):
         tools = [
             StructuredTool.from_function(
                 func=self.delegate_work,
-                name="Delegate work to co-worker",
+                name="Delegate work to coworker",
                 description=self.i18n.tools("delegate_work").format(
                     coworkers=f"[{', '.join([f'{agent.role}' for agent in self.agents])}]"
                 ),
             ),
             StructuredTool.from_function(
                 func=self.ask_question,
-                name="Ask question to co-worker",
+                name="Ask question to coworker",
                 description=self.i18n.tools("ask_question").format(
                     coworkers=f"[{', '.join([f'{agent.role}' for agent in self.agents])}]"
                 ),
@@ -33,17 +34,17 @@ class AgentTools(BaseModel):
         ]
         return tools
 
-    def delegate_work(self, task: str, context: str, coworker: Union[str, None] = None, **kwargs):
-        """Useful to delegate a specific task to a co-worker passing all necessary context and names."""
-        coworker = coworker or kwargs.get("co_worker") or kwargs.get("co-worker")
+    def delegate_work(self, task: str, context: Union[str, None] = None, coworker: Union[str, None] = None, **kwargs):
+        """Useful to delegate a specific task to a coworker passing all necessary context and names."""
+        coworker = coworker or kwargs.get("coworker") or kwargs.get("coworker")
         is_list = coworker.startswith("[") and coworker.endswith("]")
         if is_list:
             coworker = coworker[1:-1].split(",")[0]
         return self._execute(coworker, task, context)
 
-    def ask_question(self, question: str, context: str, coworker: Union[str, None] = None, **kwargs):
-        """Useful to ask a question, opinion or take from a co-worker passing all necessary context and names."""
-        coworker = coworker or kwargs.get("co_worker") or kwargs.get("co-worker")
+    def ask_question(self, question: str, context: Union[str, None] = None, coworker: Union[str, None] = None, **kwargs):
+        """Useful to ask a question, opinion or take from a coworker passing all necessary context and names."""
+        coworker = coworker or kwargs.get("coworker") or kwargs.get("coworker")
         is_list = coworker.startswith("[") and coworker.endswith("]")
         if is_list:
             coworker = coworker[1:-1].split(",")[0]
@@ -75,6 +76,6 @@ class AgentTools(BaseModel):
         task = Task(
             description=task,
             agent=agent,
-            expected_output="Your best answer to your co-worker asking you this, accounting for the context shared.",
+            expected_output="Your best answer to your coworker asking you this, accounting for the context shared.",
         )
         return agent.execute_task(task, context)

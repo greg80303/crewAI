@@ -58,7 +58,7 @@ class CrewAgentExecutor(AgentExecutor):
         if (
             self.crew
             and self.crew.memory
-            and "Action: Delegate work to co-worker" not in output.log
+            and "Action: Delegate work to coworker" not in output.log
         ):
             memory = ShortTermMemoryItem(
                 data=output.log,
@@ -95,7 +95,8 @@ class CrewAgentExecutor(AgentExecutor):
                     name=entity.name,
                     type=entity.type,
                     description=entity.description,
-                    relationships="\n".join([f"- {r}" for r in entity.relationships]),
+                    relationships="\n".join(
+                        [f"- {r}" for r in entity.relationships]),
                 )
                 self.crew._entity_memory.save(entity_memory)
 
@@ -139,7 +140,8 @@ class CrewAgentExecutor(AgentExecutor):
                 if isinstance(next_step_output, AgentFinish):
                     # Creating long term memory
                     create_long_term_memory = threading.Thread(
-                        target=self._create_long_term_memory, args=(next_step_output,)
+                        target=self._create_long_term_memory, args=(
+                            next_step_output,)
                     )
                     create_long_term_memory.start()
 
@@ -186,7 +188,8 @@ class CrewAgentExecutor(AgentExecutor):
                 yield AgentStep(action=output, observation=error)
                 return
 
-            intermediate_steps = self._prepare_intermediate_steps(intermediate_steps)
+            intermediate_steps = self._prepare_intermediate_steps(
+                intermediate_steps)
 
             # Call the LLM to see what to do.
             output = self.agent.plan(  # type: ignore #  Incompatible types in assignment (expression has type "AgentAction | AgentFinish | list[AgentAction]", variable has type "AgentAction")
@@ -219,7 +222,8 @@ class CrewAgentExecutor(AgentExecutor):
             elif callable(self.handle_parsing_errors):
                 observation = f"\n{self.handle_parsing_errors(e)}"
             else:
-                raise ValueError("Got unexpected type of `handle_parsing_errors`")
+                raise ValueError(
+                    "Got unexpected type of `handle_parsing_errors`")
             output = AgentAction("_Exception", observation, "")
 
             if run_manager:
@@ -248,7 +252,8 @@ class CrewAgentExecutor(AgentExecutor):
             if self.should_ask_for_human_input:
                 # Making sure we only ask for it once, so disabling for the next thought loop
                 self.should_ask_for_human_input = False
-                human_feedback = self._ask_human_input(output.return_values["output"])
+                human_feedback = self._ask_human_input(
+                    output.return_values["output"])
                 action = AgentAction(
                     tool="Human Input", tool_input=human_feedback, log=output.log
                 )
@@ -275,8 +280,10 @@ class CrewAgentExecutor(AgentExecutor):
                 run_manager.on_agent_action(agent_action, color="green")
 
             tool_usage = ToolUsage(
-                tools_handler=self.tools_handler,  # type: ignore # Argument "tools_handler" to "ToolUsage" has incompatible type "ToolsHandler | None"; expected "ToolsHandler"
-                tools=self.tools,  # type: ignore # Argument "tools" to "ToolUsage" has incompatible type "Sequence[BaseTool]"; expected "list[BaseTool]"
+                # type: ignore # Argument "tools_handler" to "ToolUsage" has incompatible type "ToolsHandler | None"; expected "ToolsHandler"
+                tools_handler=self.tools_handler,
+                # type: ignore # Argument "tools" to "ToolUsage" has incompatible type "Sequence[BaseTool]"; expected "list[BaseTool]"
+                tools=self.tools,
                 original_tools=self.original_tools,
                 tools_description=self.tools_description,
                 tools_names=self.tools_names,
@@ -292,11 +299,13 @@ class CrewAgentExecutor(AgentExecutor):
                 if tool_calling.tool_name.casefold().strip() in [
                     name.casefold().strip() for name in name_to_tool_map
                 ]:
-                    observation = tool_usage.use(tool_calling, agent_action.log)
+                    observation = tool_usage.use(
+                        tool_calling, agent_action.log)
                 else:
                     observation = self._i18n.errors("wrong_tool_name").format(
                         tool=tool_calling.tool_name,
-                        tools=", ".join([tool.name.casefold() for tool in self.tools]),
+                        tools=", ".join([tool.name.casefold()
+                                        for tool in self.tools]),
                     )
             yield AgentStep(action=agent_action, observation=observation)
 
