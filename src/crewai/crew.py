@@ -4,6 +4,7 @@ import uuid
 from typing import Any, Dict, List, Optional, Union
 
 from langchain_core.callbacks import BaseCallbackHandler
+from langgraph.graph import StateGraph
 from pydantic import (
     UUID4,
     BaseModel,
@@ -19,6 +20,7 @@ from pydantic_core import PydanticCustomError
 
 from crewai.agent import Agent
 from crewai.agents.cache import CacheHandler
+from crewai.graph.state import CrewState
 from crewai.memory.entity.entity_memory import EntityMemory
 from crewai.memory.long_term.long_term_memory import LongTermMemory
 from crewai.memory.short_term.short_term_memory import ShortTermMemory
@@ -122,6 +124,10 @@ class Crew(BaseModel):
         default=False,
         description="output_log_file",
     )
+    graph: Optional[StateGraph[CrewState]] = Field(
+        description="Workflow graph to be used for the crew when using `Process.graph`.",
+        default=None,
+    )
 
     @field_validator("id", mode="before")
     @classmethod
@@ -188,6 +194,20 @@ class Crew(BaseModel):
                 raise PydanticCustomError(
                     "manager_agent_in_agents",
                     "Manager agent should not be included in agents list.",
+                    {},
+                )
+
+        return self
+
+    # Validate the 'graph' field is not None when 'process' is Process.graph
+    @model_validator(mode="after")
+    def check_graph(self):
+        """Validates that the graph is set when using graph process."""
+        if self.process == Process.graph:
+            if not self.graph:
+                raise PydanticCustomError(
+                    "missing_graph",
+                    "Attribute `graph` is required when using graph process.",
                     {},
                 )
 
@@ -274,6 +294,8 @@ class Crew(BaseModel):
             result, manager_metrics = self._run_hierarchical_process()
             # type: ignore # Cannot determine type of "manager_metrics"
             metrics.append(manager_metrics)
+        elif self.process == Process.graph:
+            result = self._run_graph_process()
         else:
             raise NotImplementedError(
                 f"The process '{self.process}' is not implemented yet."
@@ -413,6 +435,7 @@ class Crew(BaseModel):
                 )
 
         self._finish_execution(task_output)
+
         # type: ignore # Incompatible return value type (got "tuple[str, Any]", expected "str")
         manager_token_usage = manager._token_process.get_summary()
         return self._format_output(
@@ -448,6 +471,10 @@ class Crew(BaseModel):
         copied_crew = Crew(**copied_data, agents=cloned_agents, tasks=cloned_tasks)
 
         return copied_crew
+
+    def _run_graph_process(self) -> str:
+        """Executes tasks in a graph process and returns the final output."""
+        raise NotImplementedError("Graph process is not implemented yet.")
 
     def _set_tasks_callbacks(self) -> None:
         """Sets callback for every task suing task_callback"""

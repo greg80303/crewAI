@@ -3,19 +3,23 @@ import os
 import re
 import threading
 import uuid
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type
 
 from langchain_openai import ChatOpenAI
+from langchain_core.runnables.base import Runnable
+from langchain_core.runnables.config import RunnableConfig
+from langchain_core.runnables.utils import Output
 from pydantic import UUID4, BaseModel, Field, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 from crewai.agent import Agent
+from crewai.graph.state import CrewState
 from crewai.tasks.task_output import TaskOutput
 from crewai.utilities import I18N, Converter, ConverterError, Printer
 from crewai.utilities.pydantic_schema_parser import PydanticSchemaParser
 
 
-class Task(BaseModel):
+class Task(BaseModel, Runnable):
     """Class that represents a task to be executed.
 
     Each task must have a description, an expected output and an agent responsible for execution.
@@ -93,6 +97,16 @@ class Task(BaseModel):
     human_input: Optional[bool] = Field(
         description="Whether the task should have a human review the final answer of the agent",
         default=False,
+    )
+
+    input_context_callback: Optional[Callable[[CrewState, Any], Any]] = Field(
+        description="Called before Task execution. Produces actual input context for this Task from the State object and the original input context (output of the previous Task).",
+        default=None,
+    )
+
+    output_context_callback: Optional[Callable[[CrewState, Any], Any]] = Field(
+        description="Called after Task execution, but before returning a value. Produces final output for this Task from the State object and the original output of the Task.",
+        default=None,
     )
 
     _original_description: str | None = None
@@ -212,6 +226,20 @@ class Task(BaseModel):
             self.callback(self.output)
 
         return exported_output
+
+    def invoke(
+        self, input: CrewState, config: Optional[RunnableConfig] = None
+    ) -> Output:
+        """Execute this task as part of a Graph.
+
+        Args:
+            input (Input): _description_
+            config (Optional[RunnableConfig], optional): _description_. Defaults to None.
+
+        Returns:
+            Output: _description_
+        """
+        pass
 
     def prompt(self) -> str:
         """Prompt the task.
