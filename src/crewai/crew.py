@@ -4,7 +4,7 @@ import uuid
 from typing import Any, Dict, List, Optional, Union
 
 from langchain_core.callbacks import BaseCallbackHandler
-from langgraph.graph import StateGraph
+from langgraph.graph.graph import CompiledGraph
 from pydantic import (
     UUID4,
     BaseModel,
@@ -20,7 +20,7 @@ from pydantic_core import PydanticCustomError
 
 from crewai.agent import Agent
 from crewai.agents.cache import CacheHandler
-from crewai.graph.state import CrewState
+from crewai.graph.taskgraph import TaskGraph
 from crewai.memory.entity.entity_memory import EntityMemory
 from crewai.memory.long_term.long_term_memory import LongTermMemory
 from crewai.memory.short_term.short_term_memory import ShortTermMemory
@@ -54,6 +54,8 @@ class Crew(BaseModel):
         task_callback: Callback to be executed after each task for every agents execution.
         step_callback: Callback to be executed after each step for every agents execution.
         share_crew: Whether you want to share the complete crew information and execution with crewAI to make the library better, and allow us to train models.
+        graph: Workflow graph to be used for the crew when using `Process.graph`.
+        cgraph: Compiled graph used internally for execution when using `Process.graph`.
     """
 
     __hash__ = object.__hash__  # type: ignore
@@ -124,10 +126,11 @@ class Crew(BaseModel):
         default=False,
         description="output_log_file",
     )
-    graph: Optional[StateGraph[CrewState]] = Field(
+    graph: Optional[TaskGraph] = Field(
         description="Workflow graph to be used for the crew when using `Process.graph`.",
         default=None,
     )
+    cgraph: Optional[CompiledGraph] = Field(default=None)
 
     @field_validator("id", mode="before")
     @classmethod
@@ -136,6 +139,15 @@ class Crew(BaseModel):
         if v:
             raise PydanticCustomError(
                 "may_not_set_field", "The 'id' field cannot be set by the user.", {}
+            )
+
+    @field_validator("cgraph", mode="before")
+    @classmethod
+    def _deny_user_set_cgraph(cls, v: Optional[Any]) -> None:
+        """Prevent manual setting of the 'cgraph' field by users."""
+        if v:
+            raise PydanticCustomError(
+                "may_not_set_field", "The 'cgraph' field cannot be set by the user.", {}
             )
 
     @field_validator("config", mode="before")
@@ -202,12 +214,18 @@ class Crew(BaseModel):
     # Validate the 'graph' field is not None when 'process' is Process.graph
     @model_validator(mode="after")
     def check_graph(self):
-        """Validates that the graph is set when using graph process."""
+        """Validates that the graph is provided and no tasks are provided when using graph process."""
         if self.process == Process.graph:
             if not self.graph:
                 raise PydanticCustomError(
                     "missing_graph",
                     "Attribute `graph` is required when using graph process.",
+                    {},
+                )
+            if self.tasks:
+                raise PydanticCustomError(
+                    "tasks_not_allowed",
+                    "Tasks should not be provided when using graph process. Add them to your TaskGraph instance instead.",
                     {},
                 )
 
@@ -442,6 +460,11 @@ class Crew(BaseModel):
             task_output, manager_token_usage
         ), manager_token_usage
 
+    def _run_graph_process(self) -> str:
+        """Executes tasks in a graph process and returns the final output."""
+
+        self.cgraph = self.graph.compile(debug=self.verbose)
+
     def copy(self):
         """Create a deep copy of the Crew."""
 
@@ -471,10 +494,6 @@ class Crew(BaseModel):
         copied_crew = Crew(**copied_data, agents=cloned_agents, tasks=cloned_tasks)
 
         return copied_crew
-
-    def _run_graph_process(self) -> str:
-        """Executes tasks in a graph process and returns the final output."""
-        raise NotImplementedError("Graph process is not implemented yet.")
 
     def _set_tasks_callbacks(self) -> None:
         """Sets callback for every task suing task_callback"""

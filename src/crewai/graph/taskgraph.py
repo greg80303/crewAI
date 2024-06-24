@@ -9,7 +9,9 @@ from crewai.graph.state import CrewStateType
 class TaskGraph(StateGraph):
     """A Crew process graph that has Tasks as nodes and CrewState (or a class derviced from it) as the state
 
-    When instantiating your Crew with ProcessType `graph`, you must also provide an instance of this class
+    When instantiating your Crew with ProcessType `graph`, you must also provide an instance of this class.
+
+    The last node (exit node) in your graph should always return the "final answer" from the run.
     """
 
     @validate_arguments
